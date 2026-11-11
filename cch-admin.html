@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cryptocash CCH — Metadata URI update</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#182332;background:#f6f8fb}
+    body{max-width:760px;margin:36px auto;padding:0 16px}
+    main{background:white;border:1px solid #e0e6ed;border-radius:15px;padding:28px;box-shadow:0 5px 18px #1422360d}
+    h1{font-size:1.5rem;margin:0 0 8px} h2{font-size:1.1rem;margin-top:25px}
+    p,li{line-height:1.55} .muted{color:#516072} .field{padding:10px 14px;background:#f4f6f8;border-radius:9px;overflow-wrap:anywhere;font-family:ui-monospace,Consolas,monospace;font-size:.9rem;margin:7px 0}
+    label{display:block;margin:12px 0} input[type=text]{padding:10px;width:100%;box-sizing:border-box;border:1px solid #9fa9b5;border-radius:8px}
+    button#send{margin-top:12px;padding:12px 18px;border:0;border-radius:9px;background:#0056b3;color:white;font-weight:650;cursor:pointer}
+    button#send:disabled{background:#a7b4c2;cursor:not-allowed} .warning{border-left:4px solid #b05e14;padding:7px 13px;background:#fff9ed}
+    .ok{color:#08733b} .bad{color:#b32020} #status{font-weight:550} #result{white-space:pre-wrap;overflow-wrap:anywhere}
+  </style>
+  <script src="https://unpkg.com/@tonconnect/ui@3.0.2/dist/tonconnect-ui.min.js"></script>
+</head>
+<body>
+<main>
+  <h1>Cryptocash (CCH) — Update metadata URI</h1>
+  <p class="warning"><strong>Live TON Mainnet action.</strong> This page requests a real wallet-signed transaction only after you explicitly click Send and approve it in your wallet. Nothing is sent merely by opening this page or connecting a wallet. Confirm the domain is <code>printdreams.github.io</code>.</p>
+  <h2>Transaction preview</h2>
+  <p class="muted">Operation <strong>0xcb862902</strong> · Query ID <strong>0</strong> · inline URL string · attached <strong>0.05 TON</strong> (network fees additional)</p>
+  <p>Recipient (jetton master):</p>
+  <div class="field" id="master"></div>
+  <p>Required sender (administrator wallet):</p>
+  <div class="field" id="admin"></div>
+  <p>New URI:</p>
+  <div class="field" id="uri"></div>
+  <p>Payload BoC (base64):</p>
+  <div class="field" id="payload"></div>
+  <h2>Connect administrator wallet</h2>
+  <div id="ton-connect"></div>
+  <p id="status" aria-live="polite">Not connected.</p>
+  <p id="metadata-status" aria-live="polite">Checking metadata JSON…</p>
+  <h2>Required review</h2>
+  <label><input type="checkbox" id="live-check" /> I checked the current live code hash, administrator, and old metadata URI using the included preflight script.</label>
+  <label><input type="checkbox" id="tx-check" /> I reviewed the recipient, exact payload, new URL and the 0.05 TON attached value.</label>
+  <label>Type <strong>UPDATE CCH</strong> to unlock the submission button:
+    <input id="phrase" type="text" autocomplete="off" spellcheck="false" placeholder="UPDATE CCH" />
+  </label>
+  <button id="send" disabled>Send live metadata update request</button>
+  <p id="result" aria-live="polite"></p>
+  <p class="muted">The connected wallet must be the on-chain administrator. If your wallet warns that this is a contract call or the transaction details differ, cancel. A successful wallet response does not by itself prove successful contract execution; check the transaction and get_jetton_data() afterward.</p>
+</main>
+<script>
+'use strict';
+const MASTER = 'EQD4bI-GV5yZc5PF2Yx5HTFJlVcP1841lHr8ba353cqQ9Sg2';
+const ADMIN_RAW = '0:b423ea6ac4dfbe5e80464e52c17f357377ed6723051a089f9ec4ab7c4b14e4fd';
+const ADMIN_FRIENDLY = 'UQC0I-pqxN--XoBGTlLBfzVzd-1nIwUaCJ-exKt8SxTk_YJ6';
+const URL = 'https://printdreams.github.io/website/metadata.json';
+const PAYLOAD = 'te6cckEBAQEAQQAAfsuGKQIAAAAAAAAAAGh0dHBzOi8vcHJpbnRkcmVhbXMuZ2l0aHViLmlvL3dlYnNpdGUvbWV0YWRhdGEuanNvbruPM9w=';
+const value = '50000000'; // 0.05 TON, in nanotons
+const $ = (id)=>document.getElementById(id);
+$('master').textContent=MASTER;
+$('admin').textContent=ADMIN_FRIENDLY+' ('+ADMIN_RAW+')';
+$('uri').textContent=URL;
+$('payload').textContent=PAYLOAD;
+let metadataOK=false;
+let busy=false;
+let connected=false;
+function ready(){
+  $('send').disabled = !(connected && metadataOK && !busy && $('live-check').checked && $('tx-check').checked && $('phrase').value.trim()==='UPDATE CCH');
+}
+function setStatus(text, isError=false){$('status').textContent=text; $('status').className=isError?'bad':'ok';}
+if (!window.TON_CONNECT_UI || !window.TON_CONNECT_UI.TonConnectUI) {
+  setStatus('TON Connect UI library failed to load; do not proceed.',true);
+}else{
+  const ui=new TON_CONNECT_UI.TonConnectUI({
+    manifestUrl:'https://printdreams.github.io/website/tonconnect-manifest.json',
+    buttonRootId:'ton-connect',
+    analytics:{mode:'off'},
+  });
+  ui.onStatusChange(wallet=>{
+    const account=wallet?.account;
+    if(!account){connected=false;setStatus('Not connected.',true)}
+    else if(account.chain!=='-239'){connected=false;setStatus('Wrong network: connect TON Mainnet.',true)}
+    else if(account.address.toLowerCase()!==ADMIN_RAW.toLowerCase()){
+      connected=false;setStatus('Wrong wallet: connected account does not equal the Cryptocash administrator. Disconnect and use the correct wallet.',true);
+    }else{connected=true;setStatus('Authorized administrator wallet connected on TON Mainnet.');}
+    ready();
+  }, error=>{setStatus('TON Connect error: '+String(error),true);connected=false;ready();});
+  $('send').addEventListener('click',async()=>{
+    ready();
+    if($('send').disabled)return;
+    if(!window.confirm('LIVE MAINNET: Approve a wallet transaction to the Cryptocash jetton master that attaches 0.05 TON and changes only the metadata URI?'))return;
+    busy=true;ready();$('result').textContent='Waiting for wallet review and approval…';
+    try{
+      const response=await ui.sendTransaction({
+        validUntil:Math.floor(Date.now()/1000)+300,
+        network:'-239',
+        from:ADMIN_RAW,
+        messages:[{address:MASTER, amount:value,payload:PAYLOAD}],
+      });
+      $('result').textContent='Wallet returned a signed/broadcast transaction request. Verify execution and the final metadata URI on the jetton master in TON Explorer. Do not send a duplicate transaction automatically. Signed BOC returned: '+(response?.boc?'yes':'not present');
+    }catch(e){
+      $('result').textContent='Transaction was not confirmed by this page: '+String(e)+'. Before any retry, inspect on-chain state and wallet history.';
+    }finally{busy=false;ready();}
+  });
+}
+for(const id of ['live-check','tx-check','phrase']) $(id).addEventListener('input',ready);
+(async()=>{
+  try{
+    const res=await fetch(URL,{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const json=await res.json();
+    if(json.name!=='Cryptocash'||json.symbol!=='CCH'||json.decimals!=='9'||typeof json.image!=='string') throw new Error('Metadata fields do not match expected values');
+    metadataOK=true;
+    $('metadata-status').textContent='Metadata JSON fetched and matches Cryptocash / CCH / 9 decimals.';
+    $('metadata-status').className='ok';
+  }catch(e){metadataOK=false;$('metadata-status').textContent='Metadata check failed: '+String(e);$('metadata-status').className='bad';}
+  ready();
+})();
+</script>
+</body>
+</html>
